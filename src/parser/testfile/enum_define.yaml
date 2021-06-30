@@ -1,0 +1,9 @@
+TestEnum:
+  - None:
+  - Value_1: #comment Value_1
+  - Value_2: #comment Value_2
+
+TestEnum2:
+  - None: # None
+  - XXX: 4 #XXX Comment
+  - YYY:
