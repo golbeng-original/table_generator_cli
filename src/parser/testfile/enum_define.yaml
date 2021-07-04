@@ -7,3 +7,16 @@ TestEnum2:
   - None: # None
   - XXX: 4 #XXX Comment
   - YYY:
+
+
+## TestFile용
+PaymentType:
+  - None: # None
+  - Cash: # Cash
+  - Gold: # Gold
+  - Pay:
+
+MoneyType:
+  - None:
+  - MoneyType_1:
+  - MoneyType_2:

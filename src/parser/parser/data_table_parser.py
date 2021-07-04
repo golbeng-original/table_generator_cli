@@ -15,19 +15,19 @@ class ExcelData:
         self.__data_column_fields = data_column_fileds
         self.__data_rows = data_rows
 
-    def get_excel_schema_data(self):
+    def get_excel_schema_data(self) -> ExcelSchemaData:
         return self.__excel_schema_data
 
-    def get_row_count(self):
+    def get_row_count(self) -> int:
         return self.__data_rows.count
 
-    def get_row(self, index):
+    def get_row(self, index) -> int:
         if index >= self.get_row_count():
             return None
 
         return self.__data_rows[index]
 
-    def get_rows(self):
+    def get_rows(self) -> list:
         for row in self.__data_rows:
             yield row
 
@@ -45,10 +45,10 @@ class ExcelData:
 
             yield mapping_row
 
-    def get_column_fields(self):
+    def get_column_fields(self) -> list:
         return self.__data_column_fields
 
-    def get_column_field_index(self, field_name:str):
+    def get_column_field_index(self, field_name:str) -> int:
         return self.__data_column_fields.index(field_name)
 
 
@@ -57,13 +57,7 @@ class ExcelDataParser:
     __workbook:Workbook = None
     __worksheet = None
 
-    def __del__(self):
-        if self.__workbook is None:
-            return
-
-        self.__workbook.close()
-
-    def parsing(self, excel_schmea_data:ExcelSchemaData, filepath):
+    def parsing(self, excel_schmea_data:ExcelSchemaData, filepath) -> ExcelData:
         
         if os.path.exists(filepath) == False:
             raise FileNotFoundError('{0} is not found'.format(filepath))
@@ -91,6 +85,9 @@ class ExcelDataParser:
 
         except:
             raise
+        finally:
+            if self.__workbook is not None:
+                self.__workbook.close()
 
     def __parse_data_columns(self):
         max_column = self.__worksheet.max_column

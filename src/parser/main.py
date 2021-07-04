@@ -1,19 +1,22 @@
 #import yaml
+import generate
 import re
 from ruamel.yaml import YAML, CommentToken
 
-from parser.schema_table_parser import ExcelSchemaParser
+from parser.schema_table_parser import ExcelSchemaParser, ExcelSchemaData
 from parser.data_table_parser import ExcelDataParser
 from parser.enum_define_parser import EnumDefineParser
-from openpyxl import Workbook, load_workbook
-import numpy
+
+from generate.enum_generator import EnumGenerator
+from generate.excel_format_sync_generator import ExcelFormatSyncGenerator
 
 print('execute parser!!')
 
 try:
     schema_parser = ExcelSchemaParser()
-    excel_schema_data = schema_parser.parsing('./testFile/piadgoods.schema.xlsx')
-    #print(schema_data)
+    excel_schema_data:ExcelSchemaData = schema_parser.parsing('./testFile/piadgoods.schema.xlsx')
+    for field in excel_schema_data.get_fields():
+        print('{0} => type : {1}'.format(field.name, field.get_nativetype()))
 
     data_parser = ExcelDataParser()
     excel_data = data_parser.parsing(excel_schema_data, './testFile/piadgoods.xlsx')
@@ -21,12 +24,20 @@ try:
     for row in excel_data.get_column_mapping_rows():
         print(row)
 
+    ## Enum 관련 처리 
+    
     enum_parser = EnumDefineParser()
-    enum_datas = enum_parser.parsing('./testFile/enum_define.yaml')
+    enum_data = enum_parser.parsing('./testFile/enum_define.yaml')
 
-    for enum_data in enum_datas:
-        print(enum_data)
+    #for enum_meta in enum_data.enum_metas:
+    #    print(enum_meta)
 
+    enum_generate = EnumGenerator(enum_data)
+    enum_generate.generate_csharp('./temp_generate/enum.cs')
+    enum_generate.generate_dart('./temp_generate/enum.dart')
+
+    syncGenerator = ExcelFormatSyncGenerator(enum_data, excel_schema_data)
+    syncGenerator.new_excel_data('./temp_generate')
 
 except Exception as e:
     print(e)

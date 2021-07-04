@@ -1,4 +1,5 @@
 import os
+from typing import final
 from numpy.core import numerictypes
 from openpyxl import Workbook, load_workbook
 from enum import Enum
@@ -125,10 +126,10 @@ class ExcelSchemaData:
         
         return schemafield.primary
 
-    def get_field_count(self):
+    def get_field_count(self) -> int:
         return self.__fields.count
 
-    def get_fields(self):
+    def get_fields(self) -> ExcelSchemaField:
         for field in self.__fields:
             yield field
 
@@ -147,12 +148,6 @@ class ExcelSchemaParser:
 
     # <string, int> = <schemafieldname, filed가 위치하는 Column Index>
     __column_oridinal:dict = {}
-
-    def __del__(self):
-        if self.__workbook is None:
-            return
-
-        self.__workbook.close()
 
     def parsing(self, filepath):
 
@@ -190,6 +185,9 @@ class ExcelSchemaParser:
 
         except:
             raise
+        finally:
+            if self.__workbook is not None:
+                self.__workbook.close()
 
     def __is_schema_file(self, filepath):
 
