@@ -1,0 +1,44 @@
+enum_generate_config:
+
+  enum_define_path: ./testfile/enum.define.yaml
+
+  csharp:
+    generate_path: ./temp_generate/GenerateEnum.cs
+    namespace: Generate
+
+  dart:
+    generate_path: ./temp_generate/generate_enum.dart
+
+
+class_generate_config:
+  
+  - language: csharp
+    generate_path: 
+      path: ./temp_gernaete/Tables.g.cs
+      usings:
+        - System
+    
+    meta_generate_path: 
+      path: ./temp_generate/TableMeta.g.cs
+      db_extenstion: '.byte'
+      usings:
+        - System
+
+    namespace: Generate
+
+    usings:
+      - System
+
+  - language: dart
+    generate_path: 
+      path: ./temp_generate/tables.g.dart
+      imports:
+        - ../enum/generate_enum.dart
+        - package:tuple/tuple.dart
+        - base_table.dart
+
+    
+    meta_generate_path:
+      path: ./temp_generate/tablemeta.g.dart
+      imports:
+

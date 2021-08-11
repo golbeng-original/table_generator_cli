@@ -8,7 +8,6 @@ TestEnum2:
   - XXX: 4 #XXX Comment
   - YYY:
 
-
 ## TestFile용
 PaymentType:
   - None: # None

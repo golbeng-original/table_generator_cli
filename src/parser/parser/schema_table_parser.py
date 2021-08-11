@@ -127,7 +127,7 @@ class ExcelSchemaData:
         return schemafield.primary
 
     def get_field_count(self) -> int:
-        return self.__fields.count
+        return len(self.__fields)
 
     def get_fields(self) -> ExcelSchemaField:
         for field in self.__fields:

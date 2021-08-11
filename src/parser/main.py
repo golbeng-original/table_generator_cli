@@ -1,43 +1,97 @@
 #import yaml
 import generate
 import re
+import numpy
+from io import StringIO
 from ruamel.yaml import YAML, CommentToken
+
+from config import YamlConfig, YamlObject
 
 from parser.schema_table_parser import ExcelSchemaParser, ExcelSchemaData
 from parser.data_table_parser import ExcelDataParser
 from parser.enum_define_parser import EnumDefineParser
 
-from generate.enum_generator import EnumGenerator
+from generate.enum_generator import CSharpEnumGenerator, DartEnumGenerator
 from generate.excel_format_sync_generator import ExcelFormatSyncGenerator
+
+#
+from generate.excel_schema_class_genertor import CSharpSchemaClassConverter, DartSchemaClassConverter
 
 print('execute parser!!')
 
+global_config = YamlConfig('./testfile/generate.config.yaml')
+
 try:
-    schema_parser = ExcelSchemaParser()
-    excel_schema_data:ExcelSchemaData = schema_parser.parsing('./testFile/piadgoods.schema.xlsx')
-    for field in excel_schema_data.get_fields():
-        print('{0} => type : {1}'.format(field.name, field.get_nativetype()))
+    
+    ## 파일 생성 관련 기본 데이터 읽어오기 ##################
 
-    data_parser = ExcelDataParser()
-    excel_data = data_parser.parsing(excel_schema_data, './testFile/piadgoods.xlsx')
-
-    for row in excel_data.get_column_mapping_rows():
-        print(row)
-
-    ## Enum 관련 처리 
+    # Enum 정의 파일 Config로 부터 읽어오기
+    enum_define_path = global_config.get_value('enum_generate_config.enum_define_path')
     
     enum_parser = EnumDefineParser()
-    enum_data = enum_parser.parsing('./testFile/enum_define.yaml')
-
+    enum_data = enum_parser.parsing(enum_define_path)
     #for enum_meta in enum_data.enum_metas:
     #    print(enum_meta)
 
-    enum_generate = EnumGenerator(enum_data)
-    enum_generate.generate_csharp('./temp_generate/enum.cs')
-    enum_generate.generate_dart('./temp_generate/enum.dart')
+    # Schema 파일 읽어오기
+    schema_parser = ExcelSchemaParser()
+    excel_schema_data:ExcelSchemaData = schema_parser.parsing('./testFile/piadgoods.schema.xlsx')
+    #for field in excel_schema_data.get_fields():
+    #    print('{0} => type : {1}'.format(field.name, field.get_nativetype()))
 
+    # ExcelData 읽어오기 (schemaParser랑 매칭 시켜야 한다..)
+    data_parser = ExcelDataParser()
+    excel_data = data_parser.parsing(excel_schema_data, './testFile/piadgoods.xlsx')
+    #for row in excel_data.get_column_mapping_rows():
+    #    print(row)
+
+    #################################################
+
+    ## enumData로 각 언어로 enum 생성 ##################
+    # csharp namespace 가져오기
+    csharp_namespace = global_config.get_value('enum_generate_config.csharp.namespace')
+
+    # Enum Parser -> csharp Generator로... 
+    cshap_enum_generator = CSharpEnumGenerator(enum_data, csharp_namespace)
+    
+    # csharp 저장 대상 파일 경로에 Enum 파일 생성하기 
+    csharp_genrate_path = global_config.get_value('enum_generate_config.csharp.generate_path')
+    cshap_enum_generator.generate(csharp_genrate_path)
+
+    # Enum Parser -> dart Generator로...
+    dart_enum_generator = DartEnumGenerator(enum_data)
+
+    # dart 저장 대상 파일 경로에 Enum 파일 생성하기
+    dart_genrate_path = global_config.get_value('enum_generate_config.dart.generate_path')
+    dart_enum_generator.generate(dart_genrate_path)
+
+    ##########################################################
+
+    ## schema로 부터 Data Excel 처리 ###########################
+
+    # schema (feat. enumdata) 정보로 부터 새 Data Excel 파일 생성
+    #syncGenerator = ExcelFormatSyncGenerator(enum_data, excel_schema_data)
+    #syncGenerator.new_excel_data('./temp_generate')
+    
+    # schema (feat. ecnumdata) 정보로 부터 기존 Data Excel Schmea 포맷 맞추기
     syncGenerator = ExcelFormatSyncGenerator(enum_data, excel_schema_data)
-    syncGenerator.new_excel_data('./temp_generate')
+    syncGenerator.format_sync('./temp_generate/piadgoods.xlsx')
+
+    #######################################################################
+
+    ## schema로 부터 각 언어 Class 생성 #######################################
+    ## 모든 schema 각 언어 class로 생성 후 한 파일에 써야한다. #####################
+
+    #class_generator = CSharpSchemaClassConverter(excel_schema_data, enum_data)
+    #print(class_generator.generate())
+    #print(class_generator.generate_meta())
+
+    class_generator = DartSchemaClassConverter(excel_schema_data, enum_data)
+    print(class_generator.generate())
+
+    print(class_generator.generate_meta())
+
+    #######################################################################
 
 except Exception as e:
     print(e)
