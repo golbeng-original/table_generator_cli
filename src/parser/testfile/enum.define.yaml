@@ -8,14 +8,52 @@ TestEnum2:
   - XXX: 4 #XXX Comment
   - YYY:
 
-## TestFile용
-PaymentType:
+CustomerType:
   - None: # None
-  - Cash: # Cash
-  - Gold: # Gold
-  - Pay:
+  - Normal: # 일반 손님
+  - Interruption: # 방해 손님
+  - Event: # 이벤트 손님
+
+CustomerSkillType:
+  - None: # None
+  - CurrencyMultiply: # 재화 획득 증가(배수)
+  - ScoreMultiply: # 평점 획득 증가(배수)
+
+ToppingType:
+  - None: # None
+  - Normal: # 일반 토핑
+  - Event: # 이벤트 토핑
+
+FacilityType:
+  - None: # None
+  - Parctice: # 손님 테이블
+  - Interior: # 단순 장식용
+  - Receipt: # 토핑 접수대
+  - Maker: # 토핑 만드는 기계
+  - Wastebaket: # 쓰레기통
+
+NeedType:
+  - None: # None
+  - NeedRate: # 설치 필요한 평점
+  - NeedTopping: # 설치 필요한 오픈 토핑
+  - NeedCustomer: # 설치 필요한 오픈 손님
+
+InstallEffectType:
+  - None: # None
+  - GetMoney: # 설치 시 게임 머니 획득 증가
+  - GetRate: # 설치 시 펑점 획득 2배 증가
+  - GetToppingUp: # 설치 시 토핑 시간 단축(%)
 
 MoneyType:
-  - None:
-  - MoneyType_1:
-  - MoneyType_2:
+  - None: # None
+  - GameMoney: # 게임 머니(쿠키)
+  - CashMoney: # 캐시 머니(잼)
+  - RateScore: # 평점
+  - PassTicket: # 패스권
+
+PaymentType:
+  - None: # None
+  - IosBilling: # IOS 플랫폼에서 지불 금액 타입
+  - AndroidBilling: # Android 플랫폼 지불 금액 타입
+  - GameMoney: # 쿠키 지불
+  - CashMoney: # 잼 지불

@@ -8,8 +8,22 @@
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
-            "program": "./main.py",
+            "program": "${file}",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: main File",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--workspace=~/Desktop/workspace/vtok_project/data", 
+                "--config=./testfile/generate.config.yaml",
+                "schema-new-data",
+                "--schema=facility",
+                "--identity=test2"
+            ]
         }
     ]
 }

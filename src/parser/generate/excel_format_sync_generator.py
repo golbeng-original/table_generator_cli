@@ -1,3 +1,4 @@
+from core.progress_woker import ProgressWorker
 import numpy
 from openpyxl.cell.cell import Cell
 from openpyxl.descriptors import base
@@ -13,7 +14,10 @@ from openpyxl.comments import Comment
 from openpyxl.worksheet.datavalidation import DataValidation, DataValidationList
 from parser.enum_define_parser import EnumMetaData, EnumMetaInfo
 from parser.schema_table_parser import ExcelSchemaData, ExcelSchemaField
+
+from core.path_util import convert_path, mkdir_path
 from . import excel_format_util as ef_util
+
 
 class ExcelFormatSyncGenerator:
 
@@ -22,87 +26,148 @@ class ExcelFormatSyncGenerator:
     __enum_data:EnumMetaData = None
     __schema_data:ExcelSchemaData = None
 
-    __workbook:Workbook = None
-
-    # enum sheet에 있는 Enum CellRange
-    __enum_cell_range = {}
-
     def __init__(self, enum_data:EnumMetaData, schema_data:ExcelSchemaData):
         self.__enum_data = enum_data
         self.__schema_data = schema_data
 
     
-    def format_sync(self, target_excel_data_path:str):
+    def format_sync_async(self, target_excel_data_path:str):
         
         if target_excel_data_path.endswith('.xlsx') == False:
             raise Exception('{0} is not .xlsx file'.format(target_excel_data_path))
 
-        absoulte_path = os.path.abspath(target_excel_data_path)
-        dirs = os.path.dirname(absoulte_path)
-        os.makedirs(dirs, exist_ok=True)
+        absoulte_path = convert_path(target_excel_data_path)
+        mkdir_path(absoulte_path)
 
         if os.path.exists(absoulte_path) == False:
             raise Exception('{0} is not found'.format(target_excel_data_path))
 
-        try:
-            self.__workbook = load_workbook(absoulte_path)
+        worker = ProgressWorker(self.__format_sync(absoulte_path))
+        worker.start()
 
-            # enum worksheet부터 생성하자...
-            self.__enum_cell_range = self.__generate_enum_worksheet(self.__enum_data, self.__schema_data)
+        return worker
 
-            # 갱신 된 enum값이 생길수 있으므로 sync를 맞춰 준다.
-            self.__format_sync_datasheet(self.__enum_data, self.__schema_data)
+    def format_sync_sync(self, target_excel_data_path:str):
+        if target_excel_data_path.endswith('.xlsx') == False:
+            raise Exception('{0} is not .xlsx file'.format(target_excel_data_path))
 
-            # validation도 없데이트가 되었으므로 기존 값이 정상인지 체크
-            self.__check_data_for_validation(self.__enum_data, self.__schema_data)
+        absoulte_path = convert_path(target_excel_data_path)
+        mkdir_path(absoulte_path)
 
-            self.__workbook.save(absoulte_path)
-        except:
-            raise
-        finally:
-            if self.__workbook is not None:
-                self.__workbook.close()
+        if os.path.exists(absoulte_path) == False:
+            raise Exception('{0} is not found'.format(target_excel_data_path))
 
-    def new_excel_data(self, target_directory_path:str):
+        return self.__format_sync(absoulte_path)(None)
 
-        if os.path.isdir(target_directory_path) == False:
-            raise Exception('{0} is not directory'.format(target_directory_path))
+    def __format_sync(self, target_excel_data_path:str):
         
-        absoulte_path = os.path.abspath(target_directory_path)
-        dirs = os.path.dirname(absoulte_path)
-        os.makedirs(dirs, exist_ok=True)
+        def work(worker:ProgressWorker):
 
-        target_data_name = '{0}.xlsx'.format(self.__schema_data.schema_name)
-        absoulte_path = os.path.join(absoulte_path, target_data_name)
+            filename = os.path.basename(target_excel_data_path)
 
-        self.__workbook = Workbook()
-        self.__workbook.remove(self.__workbook.active)
+            try:
+                if worker: worker.updateProgress(0, "{0} loading...".format(filename))
 
-        try:
-            # enum worksheet부터 생성하자...
-            self.__enum_cell_range = self.__generate_enum_worksheet(self.__enum_data, self.__schema_data)
+                workbook:Workbook = load_workbook(target_excel_data_path)
 
-            #DATA 시트가 없으면 새로 만든다.
-            if 'DATA' not in self.__workbook.sheetnames:
-                self.__new_data_worksheet(self.__enum_data, self.__schema_data)
+                if worker: worker.updateProgress(20, "enum sheet creating...")
 
-            self.__format_sync_datasheet(self.__enum_data, self.__schema_data)
+                # enum worksheet부터 생성하자...
+                # enum sheet에 있는 Enum CellRange
+                enum_cell_range = self.__generate_enum_worksheet(workbook, self.__enum_data, self.__schema_data)
 
-            self.__workbook.move_sheet("ENUM", 1)
+                if worker: worker.updateProgress(60, "data sheet sync...")
 
-            self.__workbook.save(absoulte_path)
-            self.__workbook.close()
-        except Exception as e:
-            raise e
-        finally:
-            if self.__workbook is not None:
-                self.__workbook.close()
+                # 갱신 된 enum값이 생길수 있으므로 sync를 맞춰 준다.
+                self.__format_sync_datasheet(workbook, self.__enum_data, self.__schema_data, enum_cell_range)
 
-    def __new_data_worksheet(self, enum_data:EnumMetaData, schema_data:ExcelSchemaData):
-        if 'DATA' in self.__workbook.sheetnames:
-            self.__workbook.remove(self.__workbook['DATA'])
+                if worker: worker.updateProgress(80, "data sheet value validate checking...")
 
-        data_worksheet = self.__workbook.create_sheet('DATA')
+                # validation도 없데이트가 되었으므로 기존 값이 정상인지 체크
+                self.__check_data_for_validation(workbook, self.__enum_data, self.__schema_data)
+
+                if worker: workbook.save(target_excel_data_path)
+
+                if worker: worker.updateProgress(100, "{0} format sync complete".format(filename))
+            except:
+                raise
+            finally:
+                if workbook is not None:
+                    workbook.close()
+
+        return work
+
+    def new_excel_data_async(self, new_data_path:str):
+        
+        if new_data_path.endswith('.xlsx') == False:
+            raise Exception('{0} is not .xlsx file'.format(new_data_path))
+
+        new_data_path = convert_path(new_data_path)
+        mkdir_path(new_data_path)
+
+        worker = ProgressWorker(self.__new_excel_data(new_data_path))
+        worker.start()
+
+        return worker
+
+    def new_excel_data_sync(self, new_data_path:str):
+
+        if new_data_path.endswith('.xlsx') == False:
+            raise Exception('{0} is not .xlsx file'.format(new_data_path))
+
+        new_data_path = convert_path(new_data_path)
+        mkdir_path(new_data_path)
+
+        if os.path.exists(new_data_path):
+            raise Exception(f'{new_data_path} is exist')
+
+        return self.__new_excel_data(new_data_path)(None)
+
+    def __new_excel_data(self, new_excel_data_path:str):
+
+        def work(worker:ProgressWorker):
+            
+            filename = os.path.basename(new_excel_data_path)
+
+            try:
+                if worker: worker.updateProgress(0, "{0} creating...".format(filename))
+
+                workbook = Workbook()
+                workbook.remove(workbook.active)
+
+                if worker: worker.updateProgress(20, "enum sheet creating...")
+
+                # enum worksheet부터 생성하자...
+                # enum sheet에 있는 Enum CellRange
+                enum_cell_range = self.__generate_enum_worksheet(workbook, self.__enum_data, self.__schema_data)
+
+                if worker: worker.updateProgress(60, "data sheet creating...")
+                
+                #DATA 시트가 없으면 새로 만든다.
+                if 'DATA' not in workbook.sheetnames:
+                    self.__new_data_worksheet(workbook, self.__schema_data)
+
+                self.__format_sync_datasheet(workbook, self.__enum_data, self.__schema_data, enum_cell_range)
+
+                workbook.move_sheet("ENUM", 1)
+
+                workbook.save(new_excel_data_path)
+                workbook.close()
+
+                if worker: worker.updateProgress(100, "{0} create complete".format(filename))
+            except Exception as e:
+                raise e
+            finally:
+                if workbook is not None:
+                    workbook.close()
+
+        return work
+
+    def __new_data_worksheet(self, workbook:Workbook, schema_data:ExcelSchemaData):
+        if 'DATA' in workbook.sheetnames:
+            workbook.remove(workbook['DATA'])
+
+        data_worksheet = workbook.create_sheet('DATA')
 
         column_field_group = [
             'name',
@@ -138,8 +203,8 @@ class ExcelFormatSyncGenerator:
             for cell in row:
                 cell.value = ''
                         
-    def __format_sync_datasheet(self, enum_data:EnumMetaData, schema_data:ExcelSchemaData):
-        data_sheet = self.__workbook['DATA']
+    def __format_sync_datasheet(self, workbook:Workbook, enum_data:EnumMetaData, schema_data:ExcelSchemaData, enum_cell_range:dict):
+        data_sheet = workbook['DATA']
         if data_sheet is None:
             raise Exception('DATA sheet is not exists')
 
@@ -173,16 +238,18 @@ class ExcelFormatSyncGenerator:
                 type_cell.comment = Comment(comment, '', width=400, height=400)
 
             # DataValidation 생성
-            data_validation = self.__get_validation(schema_field)
-            data_sheet.add_data_validation(data_validation)
+            data_validation = self.__get_validation(schema_field, enum_cell_range)
+            if data_validation:
 
-            # 실제 Data가 시작하는 행은 7번 행부터 시작한다.
-            for row_idx in range(7, sheet_max_row):
-                data_cell = data_sheet.cell(row_idx, column_idx)
-                data_validation.add(data_cell)
+                data_sheet.add_data_validation(data_validation)
 
-    def __check_data_for_validation(self, enum_data:EnumMetaData, schema_data:ExcelSchemaData):
-        data_sheet = self.__workbook['DATA']
+                # 실제 Data가 시작하는 행은 7번 행부터 시작한다.
+                for row_idx in range(7, sheet_max_row):
+                    data_cell = data_sheet.cell(row_idx, column_idx)
+                    data_validation.add(data_cell)
+
+    def __check_data_for_validation(self, workbook:Workbook, enum_data:EnumMetaData, schema_data:ExcelSchemaData):
+        data_sheet = workbook['DATA']
         if data_sheet is None:
             raise Exception('DATA sheet is not exists')
 
@@ -222,11 +289,11 @@ class ExcelFormatSyncGenerator:
                     if check_func(value_cell.value, enum_meta_data) == False:
                         value_cell.value = ''
 
-    def __generate_enum_worksheet(self, enum_data:EnumMetaData, schema_data:ExcelSchemaData):
-        if 'ENUM' in self.__workbook.sheetnames:
-            self.__workbook.remove(self.__workbook['ENUM'])
+    def __generate_enum_worksheet(self, workbook:Workbook, enum_data:EnumMetaData, schema_data:ExcelSchemaData):
+        if 'ENUM' in workbook.sheetnames:
+            workbook.remove(workbook['ENUM'])
 
-        enum_worksheet = self.__workbook.create_sheet('ENUM', )
+        enum_worksheet = workbook.create_sheet('ENUM', )
         enum_worksheet.sheet_state = 'hidden'
 
         # Schema에서 사용되는 Enum 타입들 조사
@@ -268,35 +335,35 @@ class ExcelFormatSyncGenerator:
 
         return schema_data.find_schema_field(schema_field_name)
 
-    def __get_validation(self, schema_field:ExcelSchemaField):
+    def __get_validation(self, schema_field:ExcelSchemaField, enum_cell_range:dict):
         
         if schema_field.get_nativetype() == numpy.int32:
             int32iinfo = numpy.iinfo(numpy.int32)
             return DataValidation(type='decimal', operator='between', formula1=int32iinfo.min, formula2=int32iinfo.max)
-
+        
         if schema_field.get_nativetype() == numpy.uint32:
             uint32iinfo = numpy.iinfo(numpy.uint32)
             return DataValidation(type='decimal', operator='between', formula1=uint32iinfo.min, formula2=uint32iinfo.max)
 
         if schema_field.get_nativetype() == numpy.float32:
-            float32iinfo = numpy.iinfo(numpy.float32)
+            float32iinfo = numpy.finfo(numpy.float32)
             return DataValidation(type='decimal', operator='between', formula1=float32iinfo.min, formula2=float32iinfo.max)
 
         if schema_field.get_nativetype() == str:
             return DataValidation(type='textLength', operator='lessThanOrEqual', formula1=1024)
 
         if schema_field.get_nativetype() == bool:
-            return DataValidation(type='list', formula1='TRUE, FALSE', allow_blank=True)
+            return DataValidation(type='list', formula1='"TRUE,FALSE"', allow_blank=True)
 
         if schema_field.get_nativetype() == Enum:
 
-            if schema_field.type not in self.__enum_cell_range:
+            if schema_field.type not in enum_cell_range:
                 raise Exception('enum_cell_rage not exit {0}'.format(schema_field.type))
 
-            enum_range = self.__enum_cell_range[schema_field.type]
+            enum_range = enum_cell_range[schema_field.type]
             formular = '=ENUM!{0}:{1}'.format(enum_range[0], enum_range[1])
 
             data_validation = DataValidation(type='list', operator='between', formula1=formular)
             return data_validation
-
+        
         return None

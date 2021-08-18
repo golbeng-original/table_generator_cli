@@ -1,44 +1,75 @@
+collection_config:
+  
+  schema_file_glob: ${workspace}/schema/*.schema.xlsx
+  data_file_glob: ${workspace}/data/*.data.xlsx
+  enum_define_file_glob: ${workspace}/enum/*.enumdefine.yaml
+
 enum_generate_config:
 
-  enum_define_path: ./testfile/enum.define.yaml
+  generate:
+    -
+      language: csharp
+      namespace: Generate
 
-  csharp:
-    generate_path: ./temp_generate/GenerateEnum.cs
-    namespace: Generate
+      path: ${workspace}/temp_generate/GenerateEnum.cs
 
-  dart:
-    generate_path: ./temp_generate/generate_enum.dart
-
+    -
+      language: dart
+      
+      path: ${workspace}/temp_generate/generate_enum.dart
 
 class_generate_config:
   
-  - language: csharp
+  - 
+    language: csharp
+
+    db_extension: .byte
+    namespace: Generate
+
     generate_path: 
-      path: ./temp_gernaete/Tables.g.cs
+      path: ${workspace}/temp_generate/Tables.g.cs
       usings:
         - System
     
     meta_generate_path: 
-      path: ./temp_generate/TableMeta.g.cs
-      db_extenstion: '.byte'
+      path: ${workspace}/temp_generate/TableMeta.g.cs
+      entry_class: GenerateTablesMeta
+      entry_name: InitalizeGenerateTableMeta
       usings:
         - System
 
-    namespace: Generate
+      meta_collection: TableMetaMapping
 
-    usings:
-      - System
+  - 
+    language: dart
 
-  - language: dart
+    db_extension: .db
+
     generate_path: 
-      path: ./temp_generate/tables.g.dart
+      path: ${workspace}/temp_generate/tables.g.dart
       imports:
-        - ../enum/generate_enum.dart
         - package:tuple/tuple.dart
-        - base_table.dart
+        - ./base_table.dart
+        - ../enum/generate_enum.dart
 
-    
     meta_generate_path:
-      path: ./temp_generate/tablemeta.g.dart
+      path: ${workspace}/temp_generate/tablemeta.g.dart
+      entry_name: initializeTableMeta
       imports:
+        - ./base_table_meta.dart
+        - ./table.g.dart
+
+      meta_collection: GenerateTableMeta
+
+data_generate_config:
+
+  -
+    language: csharp
+    path: ${workspace}/temp_generate/csharp_db/
+    db_extension: .byte
+
+  - 
+    language: dart
+    path: ${workspace}/temp_generate/dart_db/
+    db_extension: .db
 

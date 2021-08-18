@@ -1,14 +1,8 @@
 from typing import overload
 from openpyxl.reader import excel
-from enum import Enum
 
 from parser.schema_table_parser import ExcelSchemaData, ExcelSchemaField
-from parser.enum_define_parser import EnumMetaData
-
-class ConvertTargetType(Enum):
-    Empty = 0
-    CSharp = 1
-    Dart = 2
+from generate.generate_struct import ConvertTargetType
 
 _MAPPING_TYPE = {
     ConvertTargetType.CSharp : {
@@ -137,11 +131,11 @@ class SchemaClassConverter:
 
     _convert_target_type:ConvertTargetType = ConvertTargetType.Empty
     _excel_schema_data:ExcelSchemaData = None
-    _enum_data:EnumMetaData = None
+    _db_extension:str = ''
 
-    def __init__(self, excel_schema_data:ExcelSchemaData, enum_data: EnumMetaData):
+    def __init__(self, excel_schema_data:ExcelSchemaData, db_extension:str):
         self._excel_schema_data = excel_schema_data
-        self._enum_data = enum_data
+        self._db_extension = db_extension
 
     def get_converted_fields(self):
         for schmea_field in self._excel_schema_data.get_fields():
@@ -156,8 +150,8 @@ class SchemaClassConverter:
 
 class CSharpSchemaClassConverter(SchemaClassConverter):
 
-    def __init__(self, excel_schema_data:ExcelSchemaData, enum_data: EnumMetaData):
-        super().__init__(excel_schema_data, enum_data)
+    def __init__(self, excel_schema_data:ExcelSchemaData, db_extension:str):
+        super().__init__(excel_schema_data, db_extension)
         self._convert_target_type = ConvertTargetType.CSharp
 
     # override
@@ -170,9 +164,8 @@ class CSharpSchemaClassConverter(SchemaClassConverter):
         builder = ''
         builder += prefix + '{0}.Add(typeof({1}), new TableMeta()\n'.format(meta_mapping_variable, self._excel_schema_data.table_name)
         builder += prefix + '{\n'
-        builder += prefix + '\tTableName = "{0}",\n'.format(self._excel_schema_data.table_name)
-        builder += prefix + '\tDbName = "{0}",\n'.format(self._excel_schema_data.db_name)
-        builder += prefix + '\tClientDbName = "{0}"\n'.format(self._excel_schema_data.client_file_name)
+        builder += prefix + '\ttableName = "{0}",\n'.format(self._excel_schema_data.table_name)
+        builder += prefix + '\tdbName = "{0}{1}",\n'.format(self._excel_schema_data.db_name, self._db_extension)
         builder += prefix + '});\n'
 
         return builder
@@ -281,7 +274,7 @@ class CSharpSchemaClassConverter(SchemaClassConverter):
         builder = ''
         builder += prefix + 'if (propertyName.Equals("{0}", StringComparison.OrdinalIgnoreCase))\n'.format(converted_field.field_name)
         builder += prefix + '{\n'
-        builder += prefix + '\tif (CheckProprtyType({0}, ({1})value) == false)\n'.format(converted_field.field_name, converted_field.type_str)
+        builder += prefix + '\tif (CheckPropertyType({0}, ({1})value) == false)\n'.format(converted_field.field_name, converted_field.type_str)
         builder += prefix + '\t\t return false;\n'
         builder += prefix + '\t\t\n'
         builder += prefix + '\t{0} = ({1})value;\n'.format(converted_field.field_name, converted_field.type_str)
@@ -293,15 +286,23 @@ class CSharpSchemaClassConverter(SchemaClassConverter):
 
 class DartSchemaClassConverter(SchemaClassConverter):
 
-    def __init__(self, excel_schema_data:ExcelSchemaData, enum_data: EnumMetaData):
-        super().__init__(excel_schema_data, enum_data)
+    def __init__(self, excel_schema_data:ExcelSchemaData, db_extension:str):
+        super().__init__(excel_schema_data, db_extension)
         self._convert_target_type = ConvertTargetType.Dart
 
     def generate(self):
         return self.__generate_class_unit()
 
-    def generate_meta(self, meta_mapping_variable:str = 'TableMetaMapping'):
-        pass
+    def generate_meta(self, meta_mapping_variable:str = 'GenerateTableMeta'):
+        
+        meta_builder = ''
+        meta_builder += '{0}.addMeta<{1}>(\n'.format(meta_mapping_variable, self._excel_schema_data.table_name)
+        meta_builder += '{0}'.format('TableMeta()')
+        meta_builder += '..dbName = \'{0}{1}\''.format(self._excel_schema_data.db_name,self._db_extension)
+        meta_builder += '..tableName = \'{0}\''.format(self._excel_schema_data.table_name)
+        meta_builder += ');\n'
+
+        return meta_builder
 
     def __generate_class_unit(self):
         

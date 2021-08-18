@@ -1,202 +1,400 @@
-#import yaml
-import generate
+import os
 import re
-import numpy
-from io import StringIO
-from ruamel.yaml import YAML, CommentToken
+import click
 
-from config import YamlConfig, YamlObject
+from generate.generate_struct import ConvertTargetType
+from core.progress_woker import ProgressWorker
+
+from core.yaml_config import YamlConfig
+from core.path_util import register_path_enviorment, convert_path, find_glob_files, find_identity_dataname
 
 from parser.schema_table_parser import ExcelSchemaParser, ExcelSchemaData
-from parser.data_table_parser import ExcelDataParser
+from parser.data_table_parser import ExcelData, ExcelDataParser
 from parser.enum_define_parser import EnumDefineParser
 
 from generate.enum_generator import CSharpEnumGenerator, DartEnumGenerator
 from generate.excel_format_sync_generator import ExcelFormatSyncGenerator
+from generate.excel_schema_class_file_generator import CSharpSchemaClassFileGenerator
+from generate.excel_schema_class_file_generator import DartSchemaClassFileGenerator
 
-#
-from generate.excel_schema_class_genertor import CSharpSchemaClassConverter, DartSchemaClassConverter
+from generate.excel_data_generator import ExcelDataGenerator
 
-print('execute parser!!')
+def do_worker_output(is_json, worker:ProgressWorker):
 
-global_config = YamlConfig('./testfile/generate.config.yaml')
+    if is_json:
+        worker.get_progress_json_printer().output()
+    else:
+        worker.get_progress_conosle_printer().output()
 
-try:
+    if worker.error:
+        raise Exception(worker.error)
+
+@click.group()
+@click.option('--config', type=str)
+@click.option('--workspace', type=str)
+@click.option('--json', count=True)
+@click.pass_context
+def cli(ctx, config:str, workspace:str, json):
+
+    if not workspace:
+        click.echo('need input --workspace=<workspace path>', color=True)
+        exit(1)
+
+    workspace = workspace.strip('"')
+    workspace = workspace.strip()
+    workspace = convert_path(workspace)
+    if not os.path.exists(workspace):
+        click.echo('workspace not found', color=True)
+        exit(1)
     
-    ## 파일 생성 관련 기본 데이터 읽어오기 ##################
+    if not config:
+        click.echo('need input --config=<config path>', color=True)
+        exit(1)
 
-    # Enum 정의 파일 Config로 부터 읽어오기
-    enum_define_path = global_config.get_value('enum_generate_config.enum_define_path')
+    register_path_enviorment('workspace', workspace)
+
+    #
+    config = config.strip('"')
+    config = config.strip()
+    config = convert_path(config)
+
+    if not os.path.exists(config):
+        click.echo('config file not found', color=True)
+        exit(1)
     
-    enum_parser = EnumDefineParser()
-    enum_data = enum_parser.parsing(enum_define_path)
-    #for enum_meta in enum_data.enum_metas:
-    #    print(enum_meta)
+    try:
+        global_config = YamlConfig(config)
+        ctx.obj['config'] = global_config
+    except Exception as e:
+        click.echo(f'[exception] {e}')
+        exit(1)
 
-    # Schema 파일 읽어오기
-    schema_parser = ExcelSchemaParser()
-    excel_schema_data:ExcelSchemaData = schema_parser.parsing('./testFile/piadgoods.schema.xlsx')
-    #for field in excel_schema_data.get_fields():
-    #    print('{0} => type : {1}'.format(field.name, field.get_nativetype()))
+    ctx.obj['json'] = True if json else False
 
-    # ExcelData 읽어오기 (schemaParser랑 매칭 시켜야 한다..)
-    data_parser = ExcelDataParser()
-    excel_data = data_parser.parsing(excel_schema_data, './testFile/piadgoods.xlsx')
-    #for row in excel_data.get_column_mapping_rows():
-    #    print(row)
 
-    #################################################
+# enum 파일 생성 Command
+@cli.command()
+@click.option('--dart', count=True)
+@click.option('--csharp', count=True)
+@click.option('--help', count=True)
+@click.pass_context
+def enum_generate(ctx, dart, csharp, help):
 
-    ## enumData로 각 언어로 enum 생성 ##################
-    # csharp namespace 가져오기
-    csharp_namespace = global_config.get_value('enum_generate_config.csharp.namespace')
+    if help:
+        click.echo('enum meta file을 이용하여 (dart, csharp) 타겟 enum class들을 생성 해 준다.')
+        click.echo('OPTIONS')
+        click.echo('\t--dart : dart language project target db create')
+        click.echo('\t--csharp : csharp language project target db create')
+        exit(0)
 
-    # Enum Parser -> csharp Generator로... 
-    cshap_enum_generator = CSharpEnumGenerator(enum_data, csharp_namespace)
+    global_config:YamlConfig = ctx.obj['config']
+
+    if not dart and not csharp:
+        click.echo('need input --dart or --csharp')
+        exit(1)
+
+    try:
+        enum_parser = EnumDefineParser(global_config)
+        enum_data = enum_parser.parsing()
+
+        ## dart 타겟으로 enum 파일 생성
+        if dart:
+            dart_enum_generator = DartEnumGenerator(global_config)
+            dart_enum_generator.generate(enum_data)
+
+        # csharp 타겟으로 enum 파일 생성
+        if csharp:
+            csharp_enum_generator = CSharpEnumGenerator(global_config)
+            csharp_enum_generator.generate(enum_data)
     
-    # csharp 저장 대상 파일 경로에 Enum 파일 생성하기 
-    csharp_genrate_path = global_config.get_value('enum_generate_config.csharp.generate_path')
-    cshap_enum_generator.generate(csharp_genrate_path)
+    except Exception as e:
+        click.echo(f'[excpetion] {e}')
+        exit(1)
 
-    # Enum Parser -> dart Generator로...
-    dart_enum_generator = DartEnumGenerator(enum_data)
+# schema class 생성 command
+@cli.command()
+@click.option('--dart', count=True)
+@click.option('--csharp', count=True)
+@click.option('--help', count=True)
+@click.pass_context
+def class_generate(ctx, dart, csharp, help):
 
-    # dart 저장 대상 파일 경로에 Enum 파일 생성하기
-    dart_genrate_path = global_config.get_value('enum_generate_config.dart.generate_path')
-    dart_enum_generator.generate(dart_genrate_path)
+    if help:
+        click.echo('schema들을 (dart, csharp) 타겟 DAO class들을 생성 해 준다.')
+        click.echo('OPTIONS')
+        click.echo('\t--dart : dart language project target db create')
+        click.echo('\t--csharp : csharp language project target db create')
+        exit(0)
 
-    ##########################################################
+    global_config:YamlConfig = ctx.obj['config']
+    output_json = ctx.obj['json']
 
-    ## schema로 부터 Data Excel 처리 ###########################
+    if not dart and not csharp:
+        click.echo('need input --dart or --csharp')
+        exit(1)
 
-    # schema (feat. enumdata) 정보로 부터 새 Data Excel 파일 생성
-    #syncGenerator = ExcelFormatSyncGenerator(enum_data, excel_schema_data)
-    #syncGenerator.new_excel_data('./temp_generate')
+    collection_config = global_config.get_collection_config()
+
+    schema_list = find_glob_files(collection_config.schema_file_glob)
+    if not schema_list:
+        click.echo('schema list is empty')
+        exit(1)
+
+    try:
+
+        enum_parser = EnumDefineParser(global_config)
+        enum_data = enum_parser.parsing()
+
+        if dart:
+            dart_class_generator = DartSchemaClassFileGenerator(global_config)
+            worker = dart_class_generator.generate(schema_list, enum_data)
+        
+            do_worker_output(output_json, worker)
+
+        if csharp:
+            csharp_class_generator = CSharpSchemaClassFileGenerator(global_config)
+            worker = csharp_class_generator.generate(schema_list, enum_data)
+        
+            do_worker_output(output_json, worker)
     
-    # schema (feat. ecnumdata) 정보로 부터 기존 Data Excel Schmea 포맷 맞추기
-    syncGenerator = ExcelFormatSyncGenerator(enum_data, excel_schema_data)
-    syncGenerator.format_sync('./temp_generate/piadgoods.xlsx')
-
-    #######################################################################
-
-    ## schema로 부터 각 언어 Class 생성 #######################################
-    ## 모든 schema 각 언어 class로 생성 후 한 파일에 써야한다. #####################
-
-    #class_generator = CSharpSchemaClassConverter(excel_schema_data, enum_data)
-    #print(class_generator.generate())
-    #print(class_generator.generate_meta())
-
-    class_generator = DartSchemaClassConverter(excel_schema_data, enum_data)
-    print(class_generator.generate())
-
-    print(class_generator.generate_meta())
-
-    #######################################################################
-
-except Exception as e:
-    print(e)
+    except Exception as e:
+        click.echo(f'[exception] {e}')
+        exit(1)
 
 
+# shcema에 해당하는 data db로 생성 command
+@cli.command()
+@click.option('--dart', count=True)
+@click.option('--csharp', count=True)
+@click.option('--schema', type=str)
+@click.option('--help', count=True)
+@click.pass_context
+def data_generate(ctx, dart, csharp, schema, help):
 
-def csfile_paring_test():
-    enumlist_regex = r'public enum .+?}'
-    enumcontext_regex = r'public enum (?P<enum_name>.+?)\s?{(?P<enum_context>.+?)}'
+    if help:
+        click.echo('schema에 해당하는 data Excel 파일 수집 후 db 생성')
+        click.echo('OPTIONS')
+        click.echo('\t--schema=<exist schema name>')
+        click.echo('\t--dart : dart language project target db create')
+        click.echo('\t--csharp : csharp language project target db create')
+        exit(0)
 
-    filepath = '/Volumes/workspace/ing_project/CookieProject/Common/CommonPackage/src/enum/Enums.cs'
+    global_config:YamlConfig = ctx.obj['config']
+    output_json = ctx.obj['json']
 
-    with open(filepath, 'r') as filecontext:
-        context_match = filecontext.read()
-        context_match = context_match.replace('\r', '')
-        context_match = context_match.replace('\n', '')
-        context_match = context_match.replace('\t', '')
-
-
-        # enum 목록 찾기
-        enum_list = re.findall(enumlist_regex, context_match, re.I)
-        print(len(enum_list))
-        for enum in enum_list:
-
-            match = re.match(enumcontext_regex, enum, re.I)
-            if match is None:
-                continue;
-
-            enum_name = match.group('enum_name')
-            enum_context = match.group('enum_context')
-
-            enum_items = enum_context.split(',')
-            for enum_item in enum_items:
-                enum_item = enum_item.strip()
-                if len(enum_item) == 0:
-                    continue
-                
-                item_regexp = r'\[Description\(\"(.+)\"\)\](\S+?)\s?=?\s?([0-9]+)?),?'
-                item_regexp = r'\[Description\(\"(?P<description>.+?)\"\)\](?P<item>\S+)\s?=?\s?(?P<value>[0-9]+)?'
-                context_match = re.match(item_regexp, enum_item, re.I)
-
-                if context_match is None:
-                    print('{0} - fail'.format(enum_item))
-                    continue
-
-                enum_value = context_match.group('value')
-                print(context_match.group('description'), ' - ', context_match.group('item'), ' - ', enum_value)
-
-            break
-
-def get_yaml_next_value(y):
-    with open('./testfile/enum_define.yaml', 'r') as f:
-
-        yaml = YAML()
-        root = yaml.load(f)
-
-        for root_key in root:
-
-            # root_key is enum name
-            enum_context = root[root_key]
-
-            for enum_item in enum_context:
-
-                if isinstance(enum_item, dict):
-
-                    # enum_item_key, enum_item_value
-                    for enum_item_key, enum_item_value in enum_item.items():
-                        print(enum_item_key)
-                        print(enum_item_value)
-
-                    items = enum_item.ca.items
-                    for _, value in items.items():
-                        commentToken = [comment for comment in value if isinstance(comment, CommentToken)]
-                        if len(commentToken) == 0:
-                            break;
-
-                        c:CommentToken = commentToken[0]
-                        print(c.value)
-                        break;
-
-
+    if not dart and not csharp:
+        click.echo('need input --dart or --csharp')
+        exit(1)
     
-    #if y.ca.comment is not None:
+    if not schema:
+        click.echo('need input --schema=<schema name>')
+        exit(1)
 
-    #yaml_test = yaml.load_all(f, Loader=yaml.UnsafeLoader)
-    #yaml_test = yaml.load(f)
+    # schema에 해당하는 .schema.xlsx 찾아야 한다.
+    # schema에 해당하는 .data.xlsx 찾아야 한다.
 
-    #for y in yaml_test:
-    #    print(y)
+    collection_config = global_config.get_collection_config()
 
-    #print(yaml_test)
+    schema_path_list:list = find_glob_files(collection_config.schema_file_glob, schema=schema)
+    data_path_list:list = find_glob_files(collection_config.data_file_glob, schema=schema)
+
+    if not len(schema_path_list):
+        click.echo(f'{schema} schema.xlsx not exists')
+        exit(1)
+
+    if not len(data_path_list):
+        click.echo(f'{schema} data.xlsx not exists')
+        exit(1)
+
+    try:
+        # enum Data 가져오기
+        enum_parser = EnumDefineParser(global_config)
+        enum_data = enum_parser.parsing()
+
+        #schema Data 가져오기
+        schema_file = schema_path_list[0]
+        schema_parser = ExcelSchemaParser(schema_file)
+        worker:ProgressWorker = schema_parser.parsing_async(enum_data)
+        do_worker_output(output_json, worker)
+
+        schema_data:ExcelSchemaData = worker.result
+
+        # data 가져오기
+        excel_data:ExcelData = None
+        for data_path in data_path_list:
+
+            data_parser = ExcelDataParser(data_path, is_convert_sql_value=True)
+            worker = data_parser.parsing_async(schema_data, enum_data)
+
+            do_worker_output(output_json, worker)
+
+            if not excel_data:
+                excel_data = worker.result
+            else:
+                excel_data.merge(worker.result)
+
+        # data -> db로 만둘기
+        if dart:
+            data_generator = ExcelDataGenerator(global_config, ConvertTargetType.Dart)    
+            worker = data_generator.generate_async(excel_data)
+
+            do_worker_output(output_json, worker)
+
+        if csharp:
+            csharp_generator = ExcelDataGenerator(global_config, ConvertTargetType.CSharp)    
+            worker = csharp_generator.generate_async(excel_data)
+
+            do_worker_output(output_json, worker)
+
+    except Exception as e:
+        click.echo(f'[exception] {e}')
+        exit(1)
+
+#schema와 data xlsx schema 동기화
+@cli.command()
+@click.option('--schema', type=str)
+@click.pass_context
+def schema_sync(ctx, schema, help):
+
+    if help:
+        click.echo('schema와 기존에 schema와 연동되는 기존 데이터와 포맷 동기화 한다.')
+        click.echo('OPTIONS')
+        click.echo('\t--schema=<exist schema name>')
+        exit(0)
+
+    global_config:YamlConfig = ctx.obj['config']
+    output_json = ctx.obj['json']
+
+    if not schema:
+        click.echo('need input --schema=<schema name>')
+        exit(1)
+
+    # schema에 해당하는 .schema.xlsx 찾아야 한다.
+    # schema에 해당하는 .data.xlsx 찾아야 한다.
+
+    collection_config = global_config.get_collection_config()
+
+    schema_path_list:list = find_glob_files(collection_config.schema_file_glob, schema=schema)
+    data_path_list:list = find_glob_files(collection_config.data_file_glob, schema=schema)
+
+    if not len(schema_path_list):
+        click.echo(f'{schema} schema.xlsx not exists')
+        exit(1)
+
+    if not len(data_path_list):
+        click.echo(f'{schema} data.xlsx not exists')
+        exit(1)
+
+    try:
+
+        # enum Data 가져오기
+        enum_parser = EnumDefineParser(global_config)
+        enum_data = enum_parser.parsing()
+
+        #schema Data 가져오기
+        schema_file = schema_path_list[0]
+        schema_parser = ExcelSchemaParser(schema_file)
+        worker:ProgressWorker = schema_parser.parsing_async(enum_data)
+        
+        do_worker_output(output_json, worker)
+
+        schema_data:ExcelSchemaData = worker.result
+
+        # 기존에 있던 데이터 
+        for data_path in data_path_list:
+            syncGenerator = ExcelFormatSyncGenerator(enum_data, schema_data)
+            worker:ProgressWorker = syncGenerator.format_sync_async(data_path)
+
+            do_worker_output(output_json, worker)
+
+    except Exception as e:
+        click.echo(f'[exception] {e}')
+        exit(1)
 
 
-"""
-write_wb = Workbook()
+#schema에 대한 data xlsx 파일 생성
+@cli.command()
+@click.option('--schema', type=str)
+@click.option('--identity', type=str, default='')
+@click.option('--help', count=True)
+@click.pass_context
+def schema_new_data(ctx, schema:str, identity:str, help):
 
-write_ws = write_wb.create_sheet('new Sheet')
+    if help:
+        click.echo('schema에 맞는 새로운 DataExcel 파일을 생성한다.')
+        click.echo('OPTIONS')
+        click.echo('\t--schema=<exist schema name>')
+        click.echo('\t--identity=<data identity name>')
+        exit(0)
 
-write_ws = write_wb.active
-write_ws['A1'] = '숫자'
+    global_config:YamlConfig = ctx.obj['config']
+    output_json = ctx.obj['json']
 
-write_ws.append([1,2,3])
+    if not schema:
+        click.echo('need input --schema=<schema name>')
+        exit(1)
 
-os.mkdir('./temp')
+    if not re.match(r'[0-9A-Za-z]?', identity):
+        click.echo('--identity=name rule error [allow Alphabet or number]')
+        exit(1)
 
-write_wb.save('./temp/python_excel.xlsx')
-"""
+    # schema에 해당하는 .schema.xlsx 찾아야 한다.
+    # schema에 해당하는 .data.xlsx 찾아야 한다.
 
+    collection_config = global_config.get_collection_config()
+
+    schema_path_list:list = find_glob_files(collection_config.schema_file_glob, schema=schema)
+    data_path_list:list = find_glob_files(collection_config.data_file_glob, schema=schema)
+
+    try:
+        # schema 파일이 있나?
+        if not schema_path_list:
+            raise Exception(f'schema xlsx not exists')
+        
+        # 기존에 이미 파일이 있나??
+        for data_path in data_path_list:
+
+            data_identity = find_identity_dataname(data_path)
+            if data_identity.lower() == identity.lower():
+                raise Exception(f'exist data identity [{data_path}]')
+
+        # 새로 생성할 경로 가져오기
+        new_data_fullpath = convert_path(collection_config.data_file_glob)
+        
+        new_data_dir_path = os.path.dirname(new_data_fullpath)
+        
+        join_list = [schema]
+        if identity:
+            join_list.append(identity)
+        
+        new_data_path = os.path.basename(new_data_fullpath)
+        new_data_path = new_data_path.replace('*', '.'.join(join_list))
+
+        new_data_fullpath = os.path.join(new_data_dir_path, new_data_path)
+
+        # enum Data 가져오기
+        enum_parser = EnumDefineParser(global_config)
+        enum_data = enum_parser.parsing()
+
+        #schema Data 가져오기
+        schema_file = schema_path_list[0]
+        schema_parser = ExcelSchemaParser(schema_file)
+        worker:ProgressWorker = schema_parser.parsing_async(enum_data)
+        
+        do_worker_output(output_json, worker)
+
+        schema_data:ExcelSchemaData = worker.result
+
+        # data xlsx 생성
+        syncGenerator = ExcelFormatSyncGenerator(enum_data, schema_data)
+        worker:ProgressWorker = syncGenerator.new_excel_data_async(new_data_fullpath)
+        
+        do_worker_output(output_json, worker)
+
+    except Exception as e:
+        click.echo(f'[exception] {e}')
+        exit(1)
+
+
+if __name__ == '__main__':
+    cli(obj={})
