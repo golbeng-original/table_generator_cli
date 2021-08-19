@@ -1,12 +1,13 @@
 import os
 import re
 import click
+import json
 
 from generate.generate_struct import ConvertTargetType
 from core.progress_woker import ProgressWorker
 
 from core.yaml_config import YamlConfig
-from core.path_util import register_path_enviorment, convert_path, find_glob_files, find_identity_dataname
+from core.path_util import register_path_enviorment, convert_path, find_glob_files, find_identity_dataname, find_glob_filter
 
 from parser.schema_table_parser import ExcelSchemaParser, ExcelSchemaData
 from parser.data_table_parser import ExcelData, ExcelDataParser
@@ -395,6 +396,53 @@ def schema_new_data(ctx, schema:str, identity:str, help):
         click.echo(f'[exception] {e}')
         exit(1)
 
+
+@cli.command()
+@click.option('--schema', count=True)
+@click.option('--data', count=True)
+@click.option('--filter', type=str, default='')
+@click.option('--help', count=True)
+@click.pass_context
+def find(ctx, schema, data, filter:str, help):
+    
+    if help:
+        click.echo('schema 관련 된 파일들을 찾는다. (config 기반)')
+        click.echo('OPTIONS')
+        click.echo('\t--schema : schema list')
+        click.echo('\t--data : data list')
+        click.echo('\t--filter : filter string')
+        exit(0)
+
+    global_config:YamlConfig = ctx.obj['config']
+    output_json = ctx.obj['json']
+
+    if not schema and not data:
+        click.echo('')
+        exit(1)
+
+    collectionc_config = global_config.get_collection_config()
+
+    if schema:
+        schema_list = find_glob_filter(collectionc_config.schema_file_glob, filter_str=filter)
+
+        if output_json:
+            click.echo(json.dumps(schema_list))
+        else:
+            for schema_element in schema_list:
+                click.echo(schema_element)
+
+        exit(0)
+
+    if data:
+        data_list = find_glob_filter(collectionc_config.data_file_glob, filter_str=filter)
+
+        if output_json:
+            click.echo(json.dumps(data_list))
+        else:
+            for data_element in data_list:
+                click.echo(data_element)
+
+        exit(0)
 
 if __name__ == '__main__':
     cli(obj={})

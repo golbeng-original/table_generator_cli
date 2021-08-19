@@ -76,6 +76,20 @@ def find_glob_files(glob_path:str, *, schema:str = ''):
 
     return list(filter(find_schema, fullpaths))
 
+def find_glob_filter(glob_path:str, *, filter_str:str = ''):
+    
+    fullpaths = find_files(glob_path)
+
+    if not filter_str:
+        return fullpaths
+
+    def find_filter(path:str):
+        filename = os.path.basename(path)
+
+        return filename.startswith(filter_str)
+
+    return list(filter(find_filter, fullpaths))
+
 def find_identity_dataname(data_path:str):
 
     filename:str = os.path.basename(data_path)
