@@ -112,12 +112,12 @@ class ProgressWorkerConsolePrinter(ProgressWorkerPrinter):
         for progress, progress_text in self._progress_worker.progress_yield:
             progress_ch = '=' * int(progress / 10)
 
-            print(progress_format.format(progress, progress_ch, progress_text), end='\r')
+            print(progress_format.format(progress, progress_ch, progress_text), end='\r', flush=True)
 
         if self._progress_worker.error:
-            print('[error] {0:<100}'.format(str(self._progress_worker.error)))
+            print('[error] {0:<100}'.format(str(self._progress_worker.error)), flush=True)
         else:
-            print('{0:<100}'.format('complete'))
+            print('{0:<100}'.format('complete'), flush=True)
 
 class ProgressWorkerJsonPrinter(ProgressWorkerPrinter):
 
@@ -129,7 +129,7 @@ class ProgressWorkerJsonPrinter(ProgressWorkerPrinter):
                 'progress_text': progress_text
             }
 
-            print(json.dumps(json_info))
+            print(json.dumps(json_info), flush=True)
 
         if self._progress_worker.error:
             json_info = {
@@ -137,5 +137,5 @@ class ProgressWorkerJsonPrinter(ProgressWorkerPrinter):
                 'error': str(self._progress_worker.error)
             }
 
-            print(json.dumps(json_info))
+            print(json.dumps(json_info), flush=True)
             return;

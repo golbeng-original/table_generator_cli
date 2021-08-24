@@ -159,7 +159,7 @@ class CSharpSchemaClassFileGenerator(PrepareSchemaClassFileGenerator):
 
             curr_progress = (float(idx) / float(total_count)) * 50
             curr_progress = int(min(curr_progress, 50))
-            worker.updateProgress(curr_progress, "\"{0}\" convert class ".format(filename))
+            worker.updateProgress(curr_progress, "[c#]\"{0}\" convert class ".format(filename))
 
             schema_data = self._find_converter(generate_file)
 
@@ -172,7 +172,7 @@ class CSharpSchemaClassFileGenerator(PrepareSchemaClassFileGenerator):
 
             curr_progress = (float(idx + 1) / float(total_count)) * 50
             curr_progress = int(min(curr_progress, 50))
-            worker.updateProgress(curr_progress, "\"{0}\" complete".format(filename))
+            worker.updateProgress(curr_progress, "[c#]\"{0}\" complete".format(filename))
 
         # namepsace end
         if namespace:
@@ -220,7 +220,7 @@ class CSharpSchemaClassFileGenerator(PrepareSchemaClassFileGenerator):
 
             curr_progress = 50 + (float(idx) / float(total_count)) * 50
             curr_progress = int(min(curr_progress, 100))
-            worker.updateProgress(curr_progress, "\"{0}\" convert meta".format(filename))
+            worker.updateProgress(curr_progress, "[c#]\"{0}\" convert meta".format(filename))
 
             schema_data = self._find_converter(generate_file)
 
@@ -233,7 +233,7 @@ class CSharpSchemaClassFileGenerator(PrepareSchemaClassFileGenerator):
 
             curr_progress = 50 + (float(idx + 1) / float(total_count)) * 50
             curr_progress = int(min(curr_progress, 100))
-            worker.updateProgress(curr_progress, "\"{0}\" complete".format(filename))
+            worker.updateProgress(curr_progress, "[c#]\"{0}\" complete".format(filename))
 
         # entry poinr end
         file.write(global_prefix + '\t}\n')
@@ -268,7 +268,7 @@ class DartSchemaClassFileGenerator(PrepareSchemaClassFileGenerator):
 
             curr_progress = (float(idx) / float(total_count)) * 50
             curr_progress = int(min(curr_progress, 50))
-            worker.updateProgress(curr_progress, "\"{0}\" convert class ".format(filename))
+            worker.updateProgress(curr_progress, "[dart]\"{0}\" convert class ".format(filename))
 
             schema_data = self._find_converter(generate_file)
 
@@ -281,7 +281,7 @@ class DartSchemaClassFileGenerator(PrepareSchemaClassFileGenerator):
 
             curr_progress = (float(idx + 1) / float(total_count)) * 50
             curr_progress = int(min(curr_progress, 50))
-            worker.updateProgress(curr_progress, "\"{0}\" complete".format(filename))
+            worker.updateProgress(curr_progress, "[dart]\"{0}\" complete".format(filename))
 
 
     def _inner_generate_meta(self, worker: ProgressWorker, file: FileIO, generate_list: list, generate_config: GenerateYamlObject):
@@ -312,7 +312,7 @@ class DartSchemaClassFileGenerator(PrepareSchemaClassFileGenerator):
 
             curr_progress = 50 + (float(idx) / float(total_count)) * 50
             curr_progress = int(min(curr_progress, 100))
-            worker.updateProgress(curr_progress, "\"{0}\" convert meta".format(filename))
+            worker.updateProgress(curr_progress, "[dart]\"{0}\" convert meta".format(filename))
 
             schema_data = self._find_converter(generate_file)
 
@@ -325,7 +325,7 @@ class DartSchemaClassFileGenerator(PrepareSchemaClassFileGenerator):
 
             curr_progress = 50 + (float(idx + 1) / float(total_count)) * 50
             curr_progress = int(min(curr_progress, 100))
-            worker.updateProgress(curr_progress, "\"{0}\" complete".format(filename))
+            worker.updateProgress(curr_progress, "[dart]\"{0}\" complete".format(filename))
 
         # entry poinr end
         file.write('}\n')

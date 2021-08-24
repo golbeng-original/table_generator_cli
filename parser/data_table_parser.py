@@ -1,6 +1,7 @@
 
 import os
 from enum import Enum
+from numpy import False_
 
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl import Workbook, load_workbook
@@ -187,12 +188,20 @@ class ExcelDataParser:
                 column_index_mapping[index] = schema_data.find_schema_field(column_field_name)
 
         data_rows = []
-
+        
+        system_max_row = (max_row + 1 - start_row)
+        progress_row_unit = system_max_row // 10
+        progress_row_unit = progress_row_unit if progress_row_unit > 0 else 1
+        
         for row_index in range(start_row, max_row + 1):
 
-            curr_progress = 30 + (float(row_index - start_row) / float(max_row+1 -  start_row)) * 70
-            curr_progress = int(curr_progress)
-            if worker: worker.updateProgress(curr_progress, "row {0} parsing...".format(row_index))
+            if worker:
+                system_curr_row = row_index - start_row
+                curr_progress = 30 + (float(system_curr_row) / float(system_max_row)) * 70
+                curr_progress = int(curr_progress)
+
+                if system_curr_row % progress_row_unit == 0:
+                    worker.updateProgress(curr_progress, "row {0} parsing...".format(system_curr_row))
 
             # 무시 체크
             cell = workwsheet.cell(row_index, 1)
@@ -200,7 +209,28 @@ class ExcelDataParser:
             if cell_str.strip().startswith('//') is True:
                 continue
 
+            is_empty_cell = False
             # priamryKey 해당 하는 cell이 정상인가??
+            for column_index in range(2, max_column + 1):
+                
+                # schemaFiled를 가져온다.
+                column_schema_field:ExcelSchemaField = column_index_mapping[column_index - 2]
+                if column_schema_field is None:
+                    continue
+
+                if column_schema_field.primary is False:
+                    continue
+
+                cell = workwsheet.cell(row_index, column_index)
+                value = cell.value if cell is not None else None
+
+                is_empty_cell = True if value is None else False
+
+                if is_empty_cell is True:
+                    break
+
+            if is_empty_cell is True:
+                continue
 
             # row 데이터 추출
             row_bundle = []

@@ -14,9 +14,10 @@
                 "--workspace=~/Desktop/workspace/vtok_project/data",
                 "--config=~/Desktop/workspace/vtok_project/data/generate.config.yaml",
                 "--json",
-                "find",
-                "--data",
-                "--filter=c",
+                "data-generate",
+                "--schema=customer",
+                "--dart",
+                "--csharp"
             ]
         }
     ]

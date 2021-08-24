@@ -12,12 +12,13 @@ from core.path_util import convert_path, mkdir_path
 
 class ExcelDataGenerator:
 
+    __target_lang:str = ''
     __config:DataYamlObject = None
 
     def __init__(self, config:YamlConfig, convert_type:ConvertTargetType):
 
-        convert_type_str = ConvertTargetType.get_string(convert_type)
-        self.__config = config.get_data_generate_config(convert_type_str)
+        self.__target_lang = ConvertTargetType.get_string(convert_type)
+        self.__config = config.get_data_generate_config(self.__target_lang)
 
     def generate_async(self, excel_data:ExcelData):
         work = self.__generate(excel_data, self.__config.generate_path, self.__config.db_extension)
@@ -43,22 +44,22 @@ class ExcelDataGenerator:
             try:
                 conn = sqlite3.connect(db_fullpath)
 
-                if worker: worker.updateProgress(10, f'{schema_data.table_name} table drop...')
+                if worker: worker.updateProgress(10, f'[{self.__target_lang}] {schema_data.table_name} table drop...')
 
                 # 기존에 있던 Table들 삭제
                 self.__delete_all_table(conn)
 
-                if worker: worker.updateProgress(20, f'{schema_data.table_name} table create...')
+                if worker: worker.updateProgress(20, f'[{self.__target_lang}] {schema_data.table_name} table create...')
 
                 # 테이블 생성
                 self.__create_table(conn, schema_data)
 
-                if worker: worker.updateProgress(50, f'{schema_data.table_name} data insert...')
+                if worker: worker.updateProgress(50, f'[{self.__target_lang}] {schema_data.table_name} data insert...')
 
                 # Bluk Insert
                 self.__insert_rows(conn, schema_data, excel_data)
 
-                if worker: worker.updateProgress(100, f'{schema_data.table_name} generate complete')
+                if worker: worker.updateProgress(100, f'[{self.__target_lang}] {schema_data.table_name} generate complete')
 
             except:
                 raise

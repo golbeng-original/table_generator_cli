@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import click
 import json
 
@@ -89,6 +90,7 @@ def enum_generate(ctx, dart, csharp, help):
         exit(0)
 
     global_config:YamlConfig = ctx.obj['config']
+    output_json = ctx.obj['json']
 
     if not dart and not csharp:
         click.echo('need input --dart or --csharp')
@@ -98,15 +100,41 @@ def enum_generate(ctx, dart, csharp, help):
         enum_parser = EnumDefineParser(global_config)
         enum_data = enum_parser.parsing()
 
-        ## dart 타겟으로 enum 파일 생성
-        if dart:
-            dart_enum_generator = DartEnumGenerator(global_config)
-            dart_enum_generator.generate(enum_data)
+        def work(worker:ProgressWorker):
 
-        # csharp 타겟으로 enum 파일 생성
-        if csharp:
-            csharp_enum_generator = CSharpEnumGenerator(global_config)
-            csharp_enum_generator.generate(enum_data)
+            worker.updateProgress(0, 'start enum generate')
+
+            current_progress = 60
+            if dart and csharp:
+                current_progress = 30
+
+            ## dart 타겟으로 enum 파일 생성
+            if dart:
+                worker.updateProgress(current_progress, '[dart] enum generate')
+                 
+                dart_enum_generator = DartEnumGenerator(global_config)
+                dart_enum_generator.generate(enum_data)
+
+                worker.updateProgress(current_progress, '[dart] enum generate complete')
+                 
+
+            # csharp 타겟으로 enum 파일 생성
+            if csharp:
+                current_progress += 30
+                worker.updateProgress(current_progress, '[csharp] enum generate')
+
+                csharp_enum_generator = CSharpEnumGenerator(global_config)
+                csharp_enum_generator.generate(enum_data)
+
+                worker.updateProgress(current_progress, '[csharp] enum complete')
+
+            worker.updateProgress(100, "all complete!")
+
+
+        worker = ProgressWorker(work)
+        worker.start()
+
+        do_worker_output(output_json, worker)
     
     except Exception as e:
         click.echo(f'[excpetion] {e}')
@@ -234,6 +262,8 @@ def data_generate(ctx, dart, csharp, schema, help):
             else:
                 excel_data.merge(worker.result)
 
+        time.sleep(0.5)
+
         # data -> db로 만둘기
         if dart:
             data_generator = ExcelDataGenerator(global_config, ConvertTargetType.Dart)    
@@ -241,11 +271,15 @@ def data_generate(ctx, dart, csharp, schema, help):
 
             do_worker_output(output_json, worker)
 
+        time.sleep(0.5)
+
         if csharp:
             csharp_generator = ExcelDataGenerator(global_config, ConvertTargetType.CSharp)    
             worker = csharp_generator.generate_async(excel_data)
 
             do_worker_output(output_json, worker)
+
+        time.sleep(0.5)
 
     except Exception as e:
         click.echo(f'[exception] {e}')
@@ -254,6 +288,7 @@ def data_generate(ctx, dart, csharp, schema, help):
 #schema와 data xlsx schema 동기화
 @cli.command()
 @click.option('--schema', type=str)
+@click.option('--help', count=True)
 @click.pass_context
 def schema_sync(ctx, schema, help):
 
@@ -417,7 +452,7 @@ def find(ctx, schema, data, filter:str, help):
     output_json = ctx.obj['json']
 
     if not schema and not data:
-        click.echo('')
+        click.echo('need input --data or --schema [--filter=<filter Stirng>]')
         exit(1)
 
     collectionc_config = global_config.get_collection_config()
