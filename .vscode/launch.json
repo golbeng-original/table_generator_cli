@@ -15,7 +15,7 @@
                 "--config=~/Desktop/workspace/vtok_project/data/generate.config.yaml",
                 "--json",
                 "data-generate",
-                "--schema=customer",
+                "--schema=example_table",
                 "--dart",
                 "--csharp"
             ]

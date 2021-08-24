@@ -15,13 +15,10 @@ from parser.define import is_valid_primitive_value, is_valid_enum_value
 class ExcelData:
 
     __excel_schema_data:ExcelSchemaData = None
+    __data_rows = [] # list<list<object>> # ExcelSchemaData Field 순서에 맞춰져 있다.
 
-    __data_rows = [] # list<list<object>>
-    __data_column_fields = [] # list<str>
-
-    def __init__(self, excel_schema_data:ExcelSchemaData, data_column_fileds, data_rows):
+    def __init__(self, excel_schema_data:ExcelSchemaData, data_rows):
         self.__excel_schema_data = excel_schema_data
-        self.__data_column_fields = data_column_fileds
         self.__data_rows = data_rows
 
     def get_excel_schema_data(self) -> ExcelSchemaData:
@@ -45,20 +42,15 @@ class ExcelData:
         for row in self.__data_rows:
 
             mapping_row = []
-            for schema_field in self.__excel_schema_data.get_fields():
-                index = self.get_column_field_index(schema_field.name)
-                if index == -1:
-                    continue
-
-                mapping_row.append((schema_field.name, row[index]))
+            for idx, schema_field in enumerate(self.__excel_schema_data.get_fields()):
+                mapping_row.append((schema_field.name, row[idx]))
 
             yield mapping_row
 
-    def get_column_fields(self):
-        return self.__data_column_fields
 
     def get_column_field_index(self, field_name:str):
-        return self.__data_column_fields.index(field_name)
+
+        return  self.__excel_schema_data.get_field_index(field_name)
 
     def merge(self, excel_data):
 
@@ -68,15 +60,6 @@ class ExcelData:
         other_schema_data:ExcelSchemaData = excel_data.get_excel_schema_data()
         if self.get_excel_schema_data() != other_schema_data:
             raise ValueError(f'another data[schema : {other_schema_data.schema_name}] is different')
-
-        if len(self.get_column_fields()) != len(excel_data.get_column_fields()):
-            raise ValueError('column fields not different')
-
-        for idx, field_name in enumerate(self.get_column_fields()):
-            another_field_name = excel_data.get_column_fields()[idx]
-
-            if field_name != another_field_name:
-                raise ValueError('column fields not different')
 
         for row in excel_data.get_rows():
             self.__data_rows.append(row)
@@ -129,11 +112,10 @@ class ExcelDataParser:
                 column_fileds = self.__parse_data_columns(worksheet)
 
                 # None 정규화 하기
-                data_column_fiels = list(filter(lambda item : item is not None , column_fileds))
-                data_rows = self.__parse_data_rows(worker, worksheet, column_fileds, excel_schmea_data, enum_data)
+                data_rows = self.__parse_data_rows(worker, worksheet, excel_schmea_data, enum_data)
 
                 # ExcelData 구성
-                excel_data = ExcelData(excel_schmea_data, data_column_fiels, data_rows)
+                excel_data = ExcelData(excel_schmea_data, data_rows)
 
                 if worker: worker.updateProgress(100, "{0} load complete...".format(filename))
 
@@ -170,22 +152,36 @@ class ExcelDataParser:
 
         return data_columns
 
-    def __parse_data_rows(self, worker:ProgressWorker, workwsheet:Worksheet, column_order_list:list, schema_data:ExcelSchemaData, enum_data:EnumMetaData):
+    def __parse_data_rows(self, worker:ProgressWorker, workwsheet:Worksheet, schema_data:ExcelSchemaData, enum_data:EnumMetaData):
         
         start_row = 7
         max_row = workwsheet.max_row
         max_column = workwsheet.max_column
 
-        # SchemaFiled를 조사 하기 위해.. {index, SchemaField}
+        # SchemaFiled를 조사 하기 위해.. schemaData의 Schema 순서로 되어 있다. (SchemaField, column_index)
+        # column_index == -1 이면 없는걸로 간주하고 Default로 셋팅해야 한다.
         # 0 인덱스부터 시작해야 한다.
-        column_index_mapping = {}
-        for column_index in range(2, max_column + 1):
+        # 컬럼 수적 처리도 확인해야 한다.
+        column_index_mapping = [] 
+        for schema_field in schema_data.get_fields():
+            schema_field:ExcelSchemaField = schema_field
 
-            if column_index not in column_index_mapping:
+            find_index = -1
+            for column_index in range(2, max_column + 1):
+                cell = workwsheet.cell(2, column_index)
+                
+                # cell이 비어있으면 패스
+                if cell is None or not len(cell.value):
+                    continue
 
-                index = column_index - 2
-                column_field_name = column_order_list[index]
-                column_index_mapping[index] = schema_data.find_schema_field(column_field_name)
+                column_name = cell.value.strip()
+                if column_name.startswith('//'):
+                    continue
+
+                if column_name.lower() == schema_field.name.lower():
+                    find_index = column_index
+
+            column_index_mapping.append((schema_field, find_index))
 
         data_rows = []
         
@@ -211,14 +207,9 @@ class ExcelDataParser:
 
             is_empty_cell = False
             # priamryKey 해당 하는 cell이 정상인가??
-            for column_index in range(2, max_column + 1):
-                
-                # schemaFiled를 가져온다.
-                column_schema_field:ExcelSchemaField = column_index_mapping[column_index - 2]
-                if column_schema_field is None:
-                    continue
+            for schema_field, column_index in column_index_mapping:
 
-                if column_schema_field.primary is False:
+                if schema_field.primary is False:
                     continue
 
                 cell = workwsheet.cell(row_index, column_index)
@@ -234,46 +225,41 @@ class ExcelDataParser:
 
             # row 데이터 추출
             row_bundle = []
-            for column_index in range(2, max_column + 1):
+            for schema_field, column_index in column_index_mapping:
 
-                # schemaFiled를 가져온다.
-                column_schema_field:ExcelSchemaField = column_index_mapping[column_index - 2]
-                if column_schema_field is None:
-                    continue
+                value = None
 
-                cell = workwsheet.cell(row_index, column_index)
-                value = cell.value if cell is not None else None
-                if value is None:
-                    value = str(column_schema_field.get_native_default())
-                elif isinstance(value, str) and len(value) == 0:
-                    value = str(column_schema_field.get_native_default())
+                if column_index == -1:
+                    value = str(schema_field.get_native_default())
                 else:
-                    value = str(value)
+                    cell = workwsheet.cell(row_index, column_index)
+                    value = cell.value if cell is not None else None
+                    if value is None:
+                        value = str(schema_field.get_native_default())
+                    elif isinstance(value, str) and len(value) == 0:
+                        value = str(schema_field.get_native_default())
+                    else:
+                        value = str(value)
 
                 row_bundle.append(value)
 
             # row 데이터 값이 정상인가???
             for idx, value in enumerate(row_bundle):
-                column_schema_field = column_index_mapping[idx]
-                value:str = value
+                schema_field, _ = column_index_mapping[idx]
 
-                if column_schema_field is None:
-                    continue
-
-                is_valid = is_valid_primitive_value(column_schema_field, value)
+                is_valid = is_valid_primitive_value(schema_field, value)
                 if not is_valid:
-                    is_valid = is_valid_enum_value(column_schema_field, enum_data, value)
+                    is_valid = is_valid_enum_value(schema_field, enum_data, value)
 
                 if not is_valid:
-                    raise ValueError(f'error valid: [row:{row_index}] [column:{column_schema_field.name}] [type:{column_schema_field.type}] [value:{value}]')
+                    raise ValueError(f'error valid: [row:{row_index}] [column:{schema_field.name}] [type:{schema_field.type}] [value:{value}]')
 
             # row 데이터 sql value로 치환
             if self.__is_convert_sql_value:
                 for idx, value in enumerate(row_bundle):
-                    column_schema_field = column_index_mapping[idx]
-                    value:str = value
+                    schema_field, _ = column_index_mapping[idx]
 
-                    row_bundle[idx] = column_schema_field.convert_sql_value(value, enum_data)
+                    row_bundle[idx] = schema_field.convert_sql_value(value, enum_data)
 
 
             data_rows.append(row_bundle)
