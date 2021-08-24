@@ -1,3 +1,4 @@
+import enum
 import os
 import numpy
 
@@ -178,11 +179,20 @@ class ExcelSchemaData:
         for field in self.__fields:
             yield field
 
-    def get_filed(self, index:int):
+    def get_field(self, index:int):
         if index >= len(self.__fields):
             return None
 
         return self.__fields[index]
+
+    def get_field_index(self, fieldname:str):
+
+        for idx, field in enumerate(self.__fields):
+
+            if field.name.lower() == fieldname.lower():
+                return idx
+
+        return -1
 
     def __str__(self):
         print('schema_name = {0}'.format(self.schema_name))
@@ -208,7 +218,7 @@ class ExcelSchemaData:
             return False
 
         for index in range(0, self.get_field_count()):
-            if self.get_filed(index) != o.get_filed(index):
+            if self.get_field(index) != o.get_field(index):
                 return False
 
         return True
