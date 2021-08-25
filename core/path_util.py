@@ -99,3 +99,12 @@ def find_identity_dataname(data_path:str):
     filename_element = '.'.join(filename_element)
 
     return filename_element
+
+def find_domain_dataname(data_path:str):
+    
+    filename:str = os.path.basename(data_path)
+
+    filename_elements = filename.split('.')
+    filename_elements = filename_elements[1:]
+
+    return '.'.join(filename_elements)

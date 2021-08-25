@@ -3,12 +3,13 @@ import re
 import time
 import click
 import json
+import glob
 
 from generate.generate_struct import ConvertTargetType
 from core.progress_woker import ProgressWorker
 
 from core.yaml_config import YamlConfig
-from core.path_util import register_path_enviorment, convert_path, find_glob_files, find_identity_dataname, find_glob_filter
+from core.path_util import register_path_enviorment, convert_path, find_glob_files, find_identity_dataname, find_glob_filter, find_domain_dataname
 
 from parser.schema_table_parser import ExcelSchemaParser, ExcelSchemaData
 from parser.data_table_parser import ExcelData, ExcelDataParser
@@ -403,10 +404,13 @@ def schema_new_data(ctx, schema:str, identity:str, help):
         if identity:
             join_list.append(identity)
         
-        new_data_path = os.path.basename(new_data_fullpath)
-        new_data_path = new_data_path.replace('*', '.'.join(join_list))
+        new_file_name = os.path.basename(new_data_fullpath)
+        new_file_name = find_domain_dataname(new_file_name)
 
-        new_data_fullpath = os.path.join(new_data_dir_path, new_data_path)
+        join_list.append(new_file_name)
+        new_file_name = '.'.join(join_list)
+
+        new_data_fullpath = os.path.join(new_data_dir_path, new_file_name)
 
         # enum Data 가져오기
         enum_parser = EnumDefineParser(global_config)

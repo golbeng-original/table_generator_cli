@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
+            "name": "data-generate",
             "type": "python",
             "request": "launch",
             "program": "./main.py",
@@ -18,6 +18,21 @@
                 "--schema=example_table",
                 "--dart",
                 "--csharp"
+            ]
+        },
+        {
+            "name": "schema-new-data",
+            "type": "python",
+            "request": "launch",
+            "program": "./main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--workspace=~/Desktop/workspace/vtok_project/data",
+                "--config=~/Desktop/workspace/vtok_project/data/generate.config.yaml",
+                "--json",
+                "schema-new-data",
+                "--schema=example_table_2",
+                "--identity=test01",
             ]
         }
     ]
