@@ -4,6 +4,9 @@ from ruamel.yaml import YAML, CommentToken
 from core.path_util import convert_path, find_glob_files
 from core.yaml_config import YamlConfig, EnumYamlObject
 
+class DuplicateError(Exception):
+    pass
+
 class EnumField:
     field_name = ''
     field_value = None
@@ -132,15 +135,22 @@ class EnumDefineParser:
 
         for define_file_path in self.__define_file_paths:
 
-            enum_meta_infos = self.__parsing_unit(define_file_path)
+            try:
+                enum_meta_infos = self.__parsing_unit(define_file_path)
 
-            for enum_meta_info in enum_meta_infos:
-                enum_meta_info:EnumMetaInfo = enum_meta_info
+                for enum_meta_info in enum_meta_infos:
+                    enum_meta_info:EnumMetaInfo = enum_meta_info
                 
-                if enum_meta_data.is_exist_enum(enum_meta_info.enum_name):
-                    raise ValueError(f'{enum_meta_info.enum_name} is duplicate')
+                    if enum_meta_data.is_exist_enum(enum_meta_info.enum_name):
+                        raise DuplicateError(f'{enum_meta_info.enum_name} is duplicate')
 
-                enum_meta_data.enum_meta_infos.append(enum_meta_info)
+                    enum_meta_data.enum_meta_infos.append(enum_meta_info)
+            
+            # 이건 생성 자체를 하면 안된다.
+            except DuplicateError as e:
+                raise
+            except Exception as e:
+                print(e)
 
         return enum_meta_data
 
@@ -153,6 +163,9 @@ class EnumDefineParser:
 
         if self.__check_yaml_file(file_path) == False:
             raise Exception(f'{file_path} is not .yaml')
+
+        if not os.path.getsize(file_path):
+            raise Exception(f'{file_path} is empty')
 
         try:
             root = None

@@ -34,6 +34,21 @@
                 "--schema=example_table_2",
                 "--identity=test01",
             ]
+        },
+        {
+            "name": "enum-generate",
+            "type": "python",
+            "request": "launch",
+            "program": "./main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--workspace=~/Desktop/workspace/vtok_project/data",
+                "--config=~/Desktop/workspace/vtok_project/data/generate.config.yaml",
+                "--json",
+                "enum-generate",
+               "--dart",
+               "--csharp"
+            ]
         }
     ]
 }
