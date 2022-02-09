@@ -2,67 +2,61 @@ from core import progress_woker
 from core.progress_woker import ProgressWorker
 import os
 import sqlite3
-from typing import final
 
-from core.yaml_config import DataYamlObject, YamlConfig
 from parser.data_table_parser import ExcelData
 from parser.schema_table_parser import ExcelSchemaData, ExcelSchemaField
 from generate.generate_struct import ConvertTargetType
 from core.path_util import convert_path, mkdir_path
 
-class ExcelDataGenerator:
+class ExcelDataSqliteGenerator:
 
-    __target_lang:str = ''
-    __config:DataYamlObject = None
+    __outpath:str = ''
 
-    def __init__(self, config:YamlConfig, convert_type:ConvertTargetType):
-
-        self.__target_lang = ConvertTargetType.get_string(convert_type)
-        self.__config = config.get_data_generate_config(self.__target_lang)
+    def __init__(self, outpath:str):
+        self.__outpath = outpath
 
     def generate_async(self, excel_data:ExcelData):
-        work = self.__generate(excel_data, self.__config.generate_path, self.__config.db_extension)
+        work = self.__generate(excel_data, self.__outpath)
         progress_woker = ProgressWorker(work)
         progress_woker.start()
         
         return progress_woker
 
     def generate_sync(self, excel_data:ExcelData):
-        work = self.__generate(excel_data, self.__config.generate_path, self.__config.db_extension)
+        work = self.__generate(excel_data, self.__outpath)
         work(None)
 
-    def __generate(self, excel_data:ExcelData, generate_path:str, extenstion:str):
+    def __generate(self, excel_data:ExcelData, outpath:str):
 
         schema_data:ExcelSchemaData = excel_data.get_excel_schema_data()
-        generate_path = convert_path(generate_path)
-        mkdir_path(generate_path)
-
-        db_name = schema_data.db_name + extenstion
-        db_fullpath = os.path.join(generate_path, db_name)
+        outpath = convert_path(outpath)
+        
+        directory, _ = os.path.split(outpath)
+        mkdir_path(directory)
 
         def work(worker:ProgressWorker):
             try:
-                conn = sqlite3.connect(db_fullpath)
+                conn = sqlite3.connect(outpath)
 
-                if worker: worker.updateProgress(10, f'[{self.__target_lang}] {schema_data.table_name} table drop...')
+                if worker: worker.updateProgress(10, f'[{outpath}] {schema_data.table_name} table drop...')
 
                 # 기존에 있던 Table들 삭제
                 self.__delete_all_table(conn)
 
-                if worker: worker.updateProgress(20, f'[{self.__target_lang}] {schema_data.table_name} table create...')
+                if worker: worker.updateProgress(20, f'[{outpath}] {schema_data.table_name} table create...')
 
                 # 테이블 생성
                 self.__create_table(conn, schema_data)
 
-                if worker: worker.updateProgress(50, f'[{self.__target_lang}] {schema_data.table_name} data insert...')
+                if worker: worker.updateProgress(50, f'[{outpath}] {schema_data.table_name} data insert...')
 
                 # Bluk Insert
                 self.__insert_rows(conn, schema_data, excel_data)
 
-                if worker: worker.updateProgress(100, f'[{self.__target_lang}] {schema_data.table_name} generate complete')
+                if worker: worker.updateProgress(100, f'[{outpath}] {schema_data.table_name} generate complete')
 
-            except:
-                raise
+            except Exception as e:
+                print(f'[exception]{e}')
 
             finally:
                 conn.close()

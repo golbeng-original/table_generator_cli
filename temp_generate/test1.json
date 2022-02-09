@@ -1,0 +1,126 @@
+{
+    "schema": [
+        {
+            "name": "primarykey",
+            "type": "TestEnum",
+            "title": "PrimaryKey",
+            "comment": "PrimaryKey",
+            "primary": true,
+            "default": "None"
+        },
+        {
+            "name": "secondarykey",
+            "type": "String",
+            "title": "SecondaryKey",
+            "comment": "SecondaryKey",
+            "primary": true,
+            "default": ""
+        },
+        {
+            "name": "IntField1",
+            "type": "Int",
+            "title": "Int값 필드",
+            "comment": "Int값 필드",
+            "primary": false,
+            "default": "0"
+        },
+        {
+            "name": "StringField2",
+            "type": "String",
+            "title": "String값 필드",
+            "comment": "String값 필드",
+            "primary": false,
+            "default": ""
+        },
+        {
+            "name": "FloatField3",
+            "type": "Float",
+            "title": "Float값 필드",
+            "comment": "Float값 필드",
+            "primary": false,
+            "default": "0"
+        },
+        {
+            "name": "EnumField4",
+            "type": "TestEnum2",
+            "title": "Enum값 필드",
+            "comment": "Enum값 필드",
+            "primary": false,
+            "default": "None"
+        }
+    ],
+    "data": [
+        {
+            "primarykey": 2,
+            "secondarykey": "a",
+            "intfield1": 1,
+            "stringfield2": "",
+            "floatfield3": 0.0,
+            "enumfield4": 0
+        },
+        {
+            "primarykey": 2,
+            "secondarykey": "b",
+            "intfield1": 0,
+            "stringfield2": "",
+            "floatfield3": 0.0,
+            "enumfield4": 0
+        },
+        {
+            "primarykey": 2,
+            "secondarykey": "c",
+            "intfield1": 100,
+            "stringfield2": "",
+            "floatfield3": 0.0,
+            "enumfield4": 0
+        },
+        {
+            "primarykey": 1,
+            "secondarykey": "1",
+            "intfield1": 100,
+            "stringfield2": "가나다",
+            "floatfield3": 0.0,
+            "enumfield4": 0
+        },
+        {
+            "primarykey": 2,
+            "secondarykey": "2",
+            "intfield1": 200,
+            "stringfield2": "라마사",
+            "floatfield3": 0.0,
+            "enumfield4": 0
+        },
+        {
+            "primarykey": 2,
+            "secondarykey": "3",
+            "intfield1": 300,
+            "stringfield2": "아자차",
+            "floatfield3": 0.0,
+            "enumfield4": 0
+        },
+        {
+            "primarykey": 1,
+            "secondarykey": "a",
+            "intfield1": 1,
+            "stringfield2": "",
+            "floatfield3": 0.0,
+            "enumfield4": 0
+        },
+        {
+            "primarykey": 1,
+            "secondarykey": "b",
+            "intfield1": 2,
+            "stringfield2": "",
+            "floatfield3": 0.0,
+            "enumfield4": 0
+        },
+        {
+            "primarykey": 1,
+            "secondarykey": "c",
+            "intfield1": 3,
+            "stringfield2": "",
+            "floatfield3": 0.0,
+            "enumfield4": 0
+        }
+    ]
+}

@@ -61,15 +61,3 @@ class_generate_config:
 
       meta_collection: GenerateTableMeta
 
-data_generate_config:
-
-  -
-    language: csharp
-    path: ${workspace}/temp_generate/csharp_db/
-    db_extension: .byte
-
-  - 
-    language: dart
-    path: ${workspace}/temp_generate/dart_db/
-    db_extension: .db
-

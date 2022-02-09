@@ -1,6 +1,7 @@
 import os
 import re
 import time
+from typing import Counter
 import click
 import json
 import glob
@@ -20,7 +21,8 @@ from generate.excel_format_sync_generator import ExcelFormatSyncGenerator
 from generate.excel_schema_class_file_generator import CSharpSchemaClassFileGenerator
 from generate.excel_schema_class_file_generator import DartSchemaClassFileGenerator
 
-from generate.excel_data_generator import ExcelDataGenerator
+from generate.excel_data_sqlite_generator import ExcelDataSqliteGenerator
+from generate.excel_data_json_generator import ExcelDataJsonGenerator
 
 def do_worker_output(is_json, worker:ProgressWorker):
 
@@ -194,26 +196,33 @@ def class_generate(ctx, dart, csharp, help):
 
 # shcema에 해당하는 data db로 생성 command
 @cli.command()
-@click.option('--dart', count=True)
-@click.option('--csharp', count=True)
 @click.option('--schema', type=str)
+@click.option('--out-sqlite', count=True)
+@click.option('--out-json', count=True)
+@click.option('--out', type=str)
 @click.option('--help', count=True)
 @click.pass_context
-def data_generate(ctx, dart, csharp, schema, help):
+def data_generate(ctx, schema, out_sqlite, out_json, out, help):
 
     if help:
         click.echo('schema에 해당하는 data Excel 파일 수집 후 db 생성')
         click.echo('OPTIONS')
         click.echo('\t--schema=<exist schema name>')
-        click.echo('\t--dart : dart language project target db create')
-        click.echo('\t--csharp : csharp language project target db create')
+        click.echo('\t--out-sqlite : export sqlite format')
+        click.echo('\t--out-json : export json format')
+        click.echo('\t--out=<output path>')
         exit(0)
 
     global_config:YamlConfig = ctx.obj['config']
     output_json = ctx.obj['json']
 
-    if not dart and not csharp:
-        click.echo('need input --dart or --csharp')
+    out = out.strip('"')
+
+    if not out:
+        click.echo('need input --out=<path>')
+
+    if not out_sqlite and not out_json:
+        click.echo('need input --out_sqlite or --out_json')
         exit(1)
     
     if not schema:
@@ -266,17 +275,17 @@ def data_generate(ctx, dart, csharp, schema, help):
         time.sleep(0.5)
 
         # data -> db로 만둘기
-        if dart:
-            data_generator = ExcelDataGenerator(global_config, ConvertTargetType.Dart)    
+        if out_sqlite:
+            data_generator = ExcelDataSqliteGenerator(out)
             worker = data_generator.generate_async(excel_data)
 
             do_worker_output(output_json, worker)
 
         time.sleep(0.5)
 
-        if csharp:
-            csharp_generator = ExcelDataGenerator(global_config, ConvertTargetType.CSharp)    
-            worker = csharp_generator.generate_async(excel_data)
+        if out_json:
+            data_generator = ExcelDataJsonGenerator(out)
+            worker = data_generator.generate_async(excel_data)
 
             do_worker_output(output_json, worker)
 

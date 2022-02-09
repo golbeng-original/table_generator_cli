@@ -16,8 +16,8 @@
                 "--json",
                 "data-generate",
                 "--schema=example_table",
-                "--dart",
-                "--csharp"
+                "--out-json",
+                "--out=\"/Users/bjunjo/Desktop/workspace/table_generator_core/temp_generate/test1.json\""
             ]
         },
         {
